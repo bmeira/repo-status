@@ -1,50 +1,63 @@
-"use strict";
-
 const Lang = imports.lang;
 const Soup = imports.gi.Soup;
 
 
-/*
- * Methods and properties starting with _ should ideally be private. 
- * Gnome, however, doesn't currently support private methods/variables
- */
-class BitbucketApiWrapper {
+var BitbucketApiWrapper = class {
 
-    _url;
-    _authToken;
-    _httpSession;
+    #url;
+    #authToken;
+    #httpSession;
 
 
     constructor(url, authToken, timeout) {
-        this._httpSession = new Soup.SessionAsync();
-        this._httpSession['timeout'] = timeout;
+        this.#httpSession = new Soup.SessionAsync();
+        this.#httpSession['timeout'] = timeout;
         
-        this._url = url;
-        this._authToken = authToken;
+        this.#url = url;
+        this.#authToken = authToken;
     }
 
-
-    doApiCall(endpoint, callback) {
-        let request = Soup.Message.new('GET', this._url + endpoint);
-        let response = {};
+    getCallPromise(action, path) {
+        let request = Soup.Message.new(action, this.#url + path);
+        let apiResponse = {};
         
-        request.request_headers.append('Authorization', this._authToken)
+        request.request_headers.append('Authorization', this.#authToken)
         request.request_headers.set_content_type("application/json", null);
 
-        try {
-            this._httpSession.queue_message(request, Lang.bind(this,
-                function (_httpSession, message) {
-                    response['code'] = message.status_code;
-                    response['body'] = message.status_code === 200 ? JSON.parse(request['response_body'].data) : { error: "f" };
-                    callback(response);
-                })
-            );
-        }
-        catch (err) {
-            response['code'] = 418;
-            response['body'] = { error: "e" }
-            callback(response, err);
-        }
+        let httpSession = this.#httpSession;
+
+        let promise = new Promise(function(resolve, reject) {
+            try {
+                httpSession.queue_message(request, (_, response) => {
+                    apiResponse['code'] = response.status_code;
+                    switch(response.status_code){
+                        case 401:
+                            apiResponse['body'] = { error: "a" };
+                            break
+                        case 404:
+                            apiResponse['body'] = { error: "n" };
+                            break
+                        case 500:
+                            apiResponse['body'] = { error: "g" };
+                            break
+                        case 200:
+                            apiResponse['body'] = JSON.parse(response.response_body.data);
+                            break;
+                        default:
+                            apiResponse['body'] = { error: "f" };
+                            break;
+                    }
+                    resolve(apiResponse);
+                });
+            }
+            catch (err) {
+                apiResponse['code'] = 418;
+                apiResponse['body'] = { error: "e" }
+                reject(apiResponse);
+            }
+        });
+
+        return promise;
     }
 
 }
