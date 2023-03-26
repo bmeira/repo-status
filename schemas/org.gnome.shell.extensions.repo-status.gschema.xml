@@ -32,6 +32,10 @@
             <summary>Request timeout</summary>
             <description>Timeout (in ms) for API requests</description>
         </key>
+        <key name="hide-extension" type="b">
+            <default>false</default>
+            <summary>Flag to hide extension when no significant events exist</summary>
+        </key>
         <key name="show-notifications" type="b">
             <default>true</default>
             <summary>Flag to enable or disable notifications</summary>

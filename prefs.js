@@ -1,60 +1,77 @@
-"use strict";
-
-const Gio = imports.gi.Gio;
-const Gtk = imports.gi.Gtk;
+const { Gtk, Gio } = imports.gi;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
+
+const SCHEMA = 'org.gnome.shell.extensions.repo-status';
+const _settings = ExtensionUtils.getSettings(SCHEMA);
 
 
 function init() { }
 
 function buildPrefsWidget() {
 
-    this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.repo-status');
-
-    let prefsWidget = new Gtk.Grid({
-        "margin-start": 18,
-        "margin-end": 18,
-        "margin-top": 18,
-        "margin-bottom": 18,
-        column_spacing: 12,
-        row_spacing: 12,
-        visible: true,
+    let mainBox = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        'margin-top': 20,
+        'margin-bottom': 20,
+        'margin-start': 20,
+        'margin-end': 20,
+        spacing: 10,
     });
 
-    let title = new Gtk.Label({
-        label: `<b>${Me.metadata.name} Preferences</b>`,
-        halign: Gtk.Align.START,
-        use_markup: true,
-        visible: true
-    });
-    prefsWidget.attach(title, 0, 0, 2, 1);
+    let widgets = [
+        buildEntry('Repository url', 'repo-url'),
+        buildEntry('Authentication token', 'auth-token'),
+        buildEntry('PR count path', 'api-pr-count-path'),
+        buildEntry('PR count field', 'api-pr-count-property'),
+        buildEntry('Request interval (seconds)', 'api-request-interval'),
+        buildEntry('Request timeout (seconds)', 'api-request-timeout'),
+        buildSwitch('Notifications','show-notifications'),
+        buildSwitch('Hide extension','hide-extension'),
+    ];
 
-    buildComponent(1, "Authentication token", new Gtk.Entry(), prefsWidget, this.settings, "auth-token");
-    buildComponent(2, "Repository url", new Gtk.Entry(), prefsWidget, this.settings, "repo-url");
-    buildComponent(3, "PR count path", new Gtk.Entry(), prefsWidget, this.settings, "api-pr-count-path");
-    buildComponent(4, "PR count field", new Gtk.Entry(), prefsWidget, this.settings, "api-pr-count-property");
-    buildComponent(5, "Request interval (seconds)", new Gtk.Entry(), prefsWidget, this.settings, "api-request-interval");
-    buildComponent(6, "Request timeout (seconds)", new Gtk.Entry(), prefsWidget, this.settings, "api-request-timeout");
-    buildComponent(7, "Notifications", new Gtk.Switch(), prefsWidget, this.settings, "show-notifications");
+    for (let widget of widgets) {
+        mainBox.append(widget);
+    }
 
-    return prefsWidget;
+    return mainBox;
 }
 
-function buildComponent(position, labelText, component, widgetWindow, settings, key){
-    let label = new Gtk.Label({
-        label: labelText + ": ",
-        halign: Gtk.Align.START,
-        visible: true
+
+function buildBoxedLabel(text) {
+    let box = new Gtk.Box({
+        orientation: Gtk.Orientation.HORIZONTAL,
+        spacing: 10,
     });
-    widgetWindow.attach(label, 0, position, 1, 1);
+    let label = new Gtk.Label({
+        label: text
+    });
 
-    component['halign'] = Gtk.Align.END;
-    component['visible'] = true;
-    widgetWindow.attach(component, 1, position, 1, 1);
+    box.append(label);
+    return box;
+}
 
-    let bindTo = component instanceof Gtk.Switch ? "active" : "text";
+function buildSwitch(label, boundSetting) {
+    let box = buildBoxedLabel(label);
 
-    settings.bind(key, component, bindTo, Gio.SettingsBindFlags.DEFAULT);
+    let gtkSwitch = new Gtk.Switch();
+    bindSettingToWidget(boundSetting, gtkSwitch, 'state');
+
+    box.append(gtkSwitch);
+    return box;
+}
+
+function buildEntry(label, boundSetting) {
+    let box = buildBoxedLabel(label);
+
+    let entry = new Gtk.Entry();
+    bindSettingToWidget(boundSetting, entry, 'text');
+
+    box.append(entry);
+    return box;
+}
+
+function bindSettingToWidget(setting, widget, property) {
+    _settings.bind(setting, widget, property, Gio.SettingsBindFlags.DEFAULT);
 }
