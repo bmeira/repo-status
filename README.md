@@ -13,6 +13,6 @@ For now, place the code on **~/.local/share/gnome-shell/extensions/repo-status@k
 ### Pending issues/Further improvements [Version 1]
 
 - Configuration settings are not checked nor sanitized before usage
-- Configuration settings needs to be redesigned
+- ~~Configuration settings needs to be redesigned~~
 - API endpoints should be enum based
-- API call error handling needs specific errors (e.g.: authorization - a, etc.)
+- ~~API call error handling needs specific errors (e.g.: authorization - a, etc.)~~
