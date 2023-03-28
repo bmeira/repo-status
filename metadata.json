@@ -3,6 +3,8 @@
   "name": "Repository Status",
   "description": "A GNOME Shell extension (GNOME Panel applet) to keep an eye on git repositories. Currently focused on ATC's bitbucket",
   "shell-version": [
+    "40",
+    "41",
     "42"
   ],
   "url": "",

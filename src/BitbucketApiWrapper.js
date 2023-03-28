@@ -13,11 +13,12 @@ var BitbucketApiWrapper = class {
         this.#httpSession = new Soup.SessionAsync();
         this.#httpSession['timeout'] = timeout;
         
-        this.#url = url;
-        this.#authToken = authToken;
+        this.#url = url.endsWith("/") ? url.slice(0, -1) : url
+        this.#authToken = !authToken.startsWith("Bearer ") ? "Bearer " + authToken : authToken;
     }
 
     getCallPromise(action, path) {
+        path = !path.startsWith("/") ? "/" + path : path 
         let request = Soup.Message.new(action, this.#url + path);
         let apiResponse = {};
         
