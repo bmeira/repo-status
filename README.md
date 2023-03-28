@@ -1,8 +1,7 @@
 # Repository Status
 
-Repository status is a gnome extension and the goal of it is to provide a very simple overview of git repositories. 
-Currently only shows the amount of pull requests requiring approval. 
-In the long term, the objective is to improve it by adding new functionalities, like support for multiple repositories (currently only focused on bitbucket). 
+Repository Status is a simple gnome extension to provide a very simple overview of git repositories. 
+Currently only shows pull requests requiring approval on bitbucket repositories. Other functionalities, like support for multiple repositories, might be added later on. 
 
 # Installation
 
@@ -12,7 +11,11 @@ For now, place the code on **~/.local/share/gnome-shell/extensions/repo-status@k
 
 ### Pending issues/Further improvements [Version 1]
 
-- Configuration settings are not checked nor sanitized before usage
+- ~~Configuration settings are not checked nor sanitized before usage~~
 - ~~Configuration settings needs to be redesigned~~
-- API endpoints should be enum based
+- Endpoints should be enum based
 - ~~API call error handling needs specific errors (e.g.: authorization - a, etc.)~~
+
+# Acknowledgments
+
+Thanks to [gnome-github-notifications](https://github.com/alexduf/gnome-github-notifications) for inspiration

@@ -25,8 +25,8 @@ function buildPrefsWidget() {
         buildEntry('Authentication token', 'auth-token'),
         buildEntry('PR count path', 'api-pr-count-path'),
         buildEntry('PR count field', 'api-pr-count-property'),
-        buildEntry('Request interval (seconds)', 'api-request-interval'),
-        buildEntry('Request timeout (seconds)', 'api-request-timeout'),
+        buildSpin('Request interval (seconds)', 'api-request-interval', 30, 86400, 30),
+        buildSpin('Request timeout (seconds)', 'api-request-timeout', 1, 5, 1),
         buildSwitch('Notifications','show-notifications'),
         buildSwitch('Hide extension','hide-extension'),
     ];
@@ -69,6 +69,16 @@ function buildEntry(label, boundSetting) {
     bindSettingToWidget(boundSetting, entry, 'text');
 
     box.append(entry);
+    return box;
+}
+
+function buildSpin(label, boundSetting, min, max, increment) {
+    const box = buildBoxedLabel(label);
+
+    const spinButton = Gtk.SpinButton.new_with_range(min, max, increment);
+    bindSettingToWidget(boundSetting, spinButton, 'value');
+
+    box.append(spinButton);
     return box;
 }
 

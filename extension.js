@@ -14,10 +14,10 @@ function init() {
 function enable() {
     log('[repo-status][info] enabled');
     indicator = new RepoStatusExtension.RepoStatusExtension();
-    indicator.start();
+    indicator.start(true);
 }
 
 function disable() {
     log('[repo-status][info] disabled');
-    indicator.stop();
+    indicator.stop(true);
 }

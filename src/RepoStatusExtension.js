@@ -1,5 +1,4 @@
-
-const { St, Gio, GObject, Clutter } = imports.gi;
+const { St, Gio, Gtk, GObject, Clutter } = imports.gi;
 const { panelMenu, main, messageTray } = imports.ui;
 
 const Mainloop = imports.mainloop;
@@ -8,6 +7,7 @@ const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
 const BitbucketApiWrapper = Me.imports.src.BitbucketApiWrapper;
+
 
 class _RepoStatusExtension {
 
@@ -24,25 +24,22 @@ class _RepoStatusExtension {
 
     constructor() {
         this.#settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.repo-status');
-        this.#bitbucketApiWrapper = new BitbucketApiWrapper.BitbucketApiWrapper(
-            this.#getPropertyValue('repo-url'), 
-            this.#getPropertyValue('auth-token'), 
-            parseInt(this.#getPropertyValue('api-request-timeout')) //should be validated/sanitized
-        );
         this.#isInit = false;
     }
 
-    start() {
+    start(freshStart) {
         if(!this.#isInit){
-            this.#init();
+            this.#setupClients(); // Needs to be called separately from init
+            this.#init(freshStart);
         }
         main.panel._rightBox.insert_child_at_index(this.#box, 0);
         this.#scheduleApiRequest();
     }
 
-    stop(){
+    stop(fullStop){
         this.clearLoop();
-        main.panel._rightBox.remove_child(this.#box);
+        if(fullStop) main.panel._rightBox.remove_child(this.#box);
+        this.#isInit = false;
     }
 
     clearLoop() {
@@ -52,12 +49,20 @@ class _RepoStatusExtension {
         }
     }
 
-    #init(){
-        this.#buildUI();
+    #init(freshStart){
+        if(freshStart) this.#setupUi();
         this.#isInit = true;
     }
 
-    #buildUI(){
+    #setupClients(){
+        this.#bitbucketApiWrapper = new BitbucketApiWrapper.BitbucketApiWrapper(
+            this.#getPropertyValue('repo-url'), 
+            this.#getPropertyValue('auth-token'), 
+            this.#getPropertyValue('api-request-timeout')
+        );
+    }
+
+    #setupUi(){
         this.#box = new St.BoxLayout({ 
             style_class: 'panel-button',
             reactive: true,
@@ -81,16 +86,17 @@ class _RepoStatusExtension {
         this.#box.add_actor(this.#icon);
         this.#box.add_actor(this.#label);
 
-        // Logic for click event binding
-        /*this.box.connect('button-press-event', (_, event) => {
+        this.#box.connect('button-press-event', (_, event) => {
             let button = event.get_button();
 
             if (button == 1) {
-                //left click
+                try{ Gtk.show_uri(null, this.#getPropertyValue('repo-url'), Gtk.get_current_event_time()); }
+                catch (err) { this.#error("Unable to open link " + err); }
             } else if (button == 3) {
-                //right click
+                this.stop(false);
+                this.start(false);
             }
-        });*/
+        });
 
     }
 
@@ -138,7 +144,7 @@ class _RepoStatusExtension {
 
     #maybeNotify(notifValues) {
         if(notifValues === null){
-            this.#info("Got null nottifs")
+            this.#info("Got null notifs");
         }
         if(!this.#getPropertyValue('show-notifications')) return;
         if(isNaN(notifValues['nextValue'])) return;            
@@ -163,11 +169,9 @@ class _RepoStatusExtension {
     }
 
     #getPropertyValue(propertyKey){
-        
         if(propertyKey === 'show-notifications' || propertyKey === 'hide-extension') return this.#settings.get_boolean(propertyKey);
-        var value = this.#settings.get_string(propertyKey) || null;
-
-        return value;
+        if(propertyKey === 'api-request-interval' || propertyKey == 'api-request-timeout') return this.#settings.get_int(propertyKey);
+        return this.#settings.get_string(propertyKey) || null;
     }
 
 }

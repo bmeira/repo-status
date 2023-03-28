@@ -22,13 +22,15 @@
             <summary>JSON property for PR count value</summary>
             <description>Full JSON path for the pull request count value</description>
         </key>
-        <key name="api-request-interval" type="s">
-            <default>"600"</default>
+        <key name="api-request-interval" type="i">
+            <range min="30" max="86400"/>
+            <default>600</default>
             <summary>API request interval</summary>
             <description>Interval (in seconds) to perform API requests</description>
         </key>
-        <key name="api-request-timeout" type="s">
-            <default>"2"</default>
+        <key name="api-request-timeout" type="i">
+            <range min="1" max="5"/>
+            <default>2</default>
             <summary>Request timeout</summary>
             <description>Timeout (in ms) for API requests</description>
         </key>
