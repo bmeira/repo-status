@@ -12,16 +12,6 @@
             <default>""</default>
             <summary>Repository URL</summary>
         </key>
-        <key name="api-pr-count-path" type="s">
-            <default>"rest/api/latest/inbox/pull-requests/count"</default>
-            <summary>API path for pull request count</summary>
-            <description>Path for the Pull request count endpoint</description>
-        </key>
-        <key name="api-pr-count-property" type="s">
-            <default>"count"</default>
-            <summary>JSON property for PR count value</summary>
-            <description>Full JSON path for the pull request count value</description>
-        </key>
         <key name="api-request-interval" type="i">
             <range min="30" max="86400"/>
             <default>600</default>
