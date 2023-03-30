@@ -13,7 +13,7 @@ For now, place the code on **~/.local/share/gnome-shell/extensions/repo-status@k
 
 - ~~Configuration settings are not checked nor sanitized before usage~~
 - ~~Configuration settings needs to be redesigned~~
-- Endpoints should be enum based
+- ~~Endpoints should be enum based~~
 - ~~API call error handling needs specific errors (e.g.: authorization - a, etc.)~~
 
 # Acknowledgments

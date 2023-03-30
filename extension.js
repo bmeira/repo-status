@@ -2,9 +2,10 @@ const Main = imports.ui.main;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
-const RepoStatusExtension = Me.imports.src.RepoStatusExtension;
+const RepoStatusExtension = Me.imports.src.main.RepoStatusExtension.RepoStatusExtension;
 
 
+const logger = new Me.imports.src.util.Logger.Logger('Extension');
 let indicator;
 
 
@@ -12,12 +13,12 @@ function init() {
 }
 
 function enable() {
-    log('[repo-status][info] enabled');
-    indicator = new RepoStatusExtension.RepoStatusExtension();
+    logger.info('enabled');
+    indicator = new RepoStatusExtension();
     indicator.start(true);
 }
 
 function disable() {
-    log('[repo-status][info] disabled');
+    logger.info('disabled');
     indicator.stop(true);
 }

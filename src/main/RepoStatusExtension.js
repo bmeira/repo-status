@@ -6,7 +6,10 @@ const Mainloop = imports.mainloop;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
-const BitbucketApiWrapper = Me.imports.src.BitbucketApiWrapper;
+const BitbucketApiWrapper = Me.imports.src.main.BitbucketApiWrapper;
+const ApiOperation = Me.imports.src.util.ApiOperation;
+
+const logger = new Me.imports.src.util.Logger.Logger('RepoStatusExtension');
 
 
 class _RepoStatusExtension {
@@ -33,7 +36,7 @@ class _RepoStatusExtension {
             this.#init(freshStart);
         }
         main.panel._rightBox.insert_child_at_index(this.#box, 0);
-        this.#scheduleApiRequest();
+        this.#scheduleApiRequest(ApiOperation.ApiOperation.PullRequestCount);
     }
 
     stop(fullStop){
@@ -71,13 +74,13 @@ class _RepoStatusExtension {
         });
 
         this.#icon = new St.Icon({
-            gicon: Gio.icon_new_for_string(Me.path + "/icons/github.png"),
-            style_class: "system-status-icon",
-            icon_size: "16"
+            gicon: Gio.icon_new_for_string(Me.path + '/icons/github.png'),
+            style_class: 'system-status-icon',
+            icon_size: '16'
         });
 
         this.#label = new St.Label({
-            text: "l",
+            text: 'l',
             style_class: 'system-status-icon notifications-length',
             y_align: Clutter.ActorAlign.CENTER,
             y_expand: true,
@@ -91,7 +94,7 @@ class _RepoStatusExtension {
 
             if (button == 1) {
                 try{ Gtk.show_uri(null, this.#getPropertyValue('repo-url'), Gtk.get_current_event_time()); }
-                catch (err) { this.#error("Unable to open link " + err); }
+                catch (err) { logger.error("Unable to open link " + err); }
             } else if (button == 3) {
                 this.stop(false);
                 this.start(false);
@@ -100,38 +103,38 @@ class _RepoStatusExtension {
 
     }
 
-    #scheduleApiRequest() {
+    #scheduleApiRequest(apiOperation) {
         this.clearLoop();
-        this.#bitbucketApiWrapper.getCallPromise('GET', this.#getPropertyValue('api-pr-count-path'))
+        this.#bitbucketApiWrapper.getCallPromise(apiOperation)
         .then(
-            result => this.#handleApiResponse(result),
-            error => this.#handleApiResponse(_, error)
+            result => this.#handleApiResponse(apiOperation, result),
+            error => this.#handleApiResponse(_, _, error)
         )
         .then(
             result => this.#maybeNotify(result),
             error => this.#maybeNotify(error)
         )
-        .catch(err => this.#error(err));
+        .catch(err => logger.error(err));
 
-        let interval = this.#getPropertyValue('api-request-interval'); 
+        let interval = this.#getPropertyValue("api-request-interval"); 
         
-        //this.#info("Scheduling next request in " + interval + " seconds")
+        //logger.info("Scheduling next request in " + interval + " seconds")
         this.#timeout = Mainloop.timeout_add_seconds(interval, () => { 
-            this.#scheduleApiRequest();
+            this.#scheduleApiRequest(apiOperation);
             return false;
         });
     }
 
-    #handleApiResponse(apiResponse, err = null) {
-        //this.#info("API Response --> " + JSON.stringify(apiResponse));
+    #handleApiResponse(apiOperation, apiResponse, err = null) {
+        //logger.info("API Response --> " + JSON.stringify(apiResponse));
         if(err) {
-            this.#error(err);
+            logger.error(err);
             return null;
         }
 
-        let nextValue = apiResponse.code !== 200 ? apiResponse.body.error : apiResponse.body[this.#getPropertyValue('api-pr-count-property')];
+        let nextValue = apiResponse.code !== 200 ? apiResponse.body.error : apiResponse.body[apiOperation.response];
 
-        this.#box.visible = !this.#getPropertyValue('hide-extension') || nextValue != 0
+        this.#box.visible = !this.#getPropertyValue("hide-extension") || nextValue != 0
         
         let values = {};
         values['currentValue'] = this.#label.get_text();
@@ -144,43 +147,34 @@ class _RepoStatusExtension {
 
     #maybeNotify(notifValues) {
         if(notifValues === null){
-            this.#error("Got null notifs");
+            logger.error("Got null notifs");
             return;
         }
-        if(!this.#getPropertyValue('show-notifications')) return;
+        if(!this.#getPropertyValue("show-notifications")) return;
         if(isNaN(notifValues['nextValue'])) return;            
         if(Number(notifValues['nextValue']) < 1) return;
 
         if(!isNaN(notifValues['currentValue']) && Number(notifValues['nextValue']) <= Number(notifValues['nextValue'])) return;
     
         let message = "New PR pending approval";
-        let source = new messageTray.Source(Me.metadata.name, "mail-drafts-symbolic");
+        let source = new messageTray.Source(Me.metadata.name, 'mail-drafts-symbolic');
         main.messageTray.add(source);
         let notification = new messageTray.Notification(source, Me.metadata.name, message);
         notification.setTransient(false);
         source.showNotification(notification);
     }
 
-    #error(message){
-        global.log('[repo-status][error] ' + message);
-    }
-
-    #info(message){
-        global.log('[repo-status][info] ' + message);
-    }
-
     #getPropertyValue(propertyKey){
-        if(propertyKey === 'show-notifications' || propertyKey === 'hide-extension') return this.#settings.get_boolean(propertyKey);
-        if(propertyKey === 'api-request-interval' || propertyKey == 'api-request-timeout') return this.#settings.get_int(propertyKey);
+        if(propertyKey === "show-notifications" || propertyKey === "hide-extension") return this.#settings.get_boolean(propertyKey);
+        if(propertyKey === "api-request-interval" || propertyKey == "api-request-timeout") return this.#settings.get_int(propertyKey);
         return this.#settings.get_string(propertyKey) || null;
     }
 
 }
 
 var RepoStatusExtension = class RepoStatusExtension extends _RepoStatusExtension {
-    constructor(params) {
+    constructor() {
         super();
-
-        Object.assign(this, params);
+        Object.assign(this);
     }
 };
