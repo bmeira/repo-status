@@ -4,24 +4,24 @@ const Soup = imports.gi.Soup;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
-const ApiOperation = Me.imports.src.util.ApiOperation;
+const ClientOperation = Me.imports.src.main.ClientOperation;
 
-const logger = new Me.imports.src.util.Logger.Logger('BitbucketApiWrapper');
+const logger = new Me.imports.src.util.Logger.Logger('BitbucketClient');
 
 
-class _BitbucketApiWrapper {
+class _BitbucketClient {
 
     #url;
     #authToken;
     #httpSession;
 
-    #apiOperations;
+    #operations
 
 
     constructor(url, authToken, timeout) {
-        // field property is used to map the response structure from the client (inside body) to a common response structure (client independent)
-        this.#apiOperations = new Map([
-            [ApiOperation.ApiOperation.PullRequestCount, { path:'/rest/api/latest/inbox/pull-requests/count', action:'GET', field:'count' }],
+        // field property is used to define the relevant fields to obtain data from. This allows normalization between multiple clients
+        this.#operations = new Map([
+            [ClientOperation.ClientOperation.PullRequestCount, { path:'/rest/api/latest/inbox/pull-requests/count', action:'GET', field:'count' }],
         ])
 
         this.#httpSession = new Soup.SessionAsync();
@@ -31,14 +31,14 @@ class _BitbucketApiWrapper {
         this.#authToken = !authToken.startsWith("Bearer ") ? "Bearer " + authToken : authToken;
     }
 
-    getCallPromise(apiOperation) {
-        if(!this.#apiOperations.has(apiOperation)){
-            logger.info(apiOperation + " not supported");
+    getOperationPromise(operation) {
+        if(!this.#operations.has(operation)){
+            logger.info(operation + " not supported");
             return { code: 418, body: { error: 'e' } };
         }
         
-        // Some variables/methods need to be mapped for injection
-        let clientProperties = this.#apiOperations.get(apiOperation);
+        // Some variables/methods need to be re-assigned for injection
+        let clientProperties = this.#operations.get(operation);
         let httpSession = this.#httpSession;
         let buildResponse = this.#buildResponse;
 
@@ -50,53 +50,53 @@ class _BitbucketApiWrapper {
         let promise = new Promise(function(resolve, reject) {
             try {
                 httpSession.queue_message(request, (_, response) => {
-                    resolve(buildResponse(apiOperation, response, clientProperties));
+                    resolve(buildResponse(operation, response, clientProperties));
                 });
             }
             catch (err) {
-                reject(_, _, _, err);
+                reject(buildResponse(_, _, _, err));
             }
         });
 
         return promise;
     }
 
-    #buildResponse(apiOperation, apiResponse, clientProperties, err = null){
-        let wrapperResponse = {};
+    #buildResponse(operation, apiResponse, clientProperties, err = null){
+        let clientResponse = {};
         if(err != null){
             logger.error(err);
-            wrapperResponse['code'] = 418;
-            wrapperResponse['body'] = { error: "e" }
-            return wrapperResponse;
+            clientResponse['code'] = 418;
+            clientResponse['body'] = { error: "e" }
+            return clientResponse;
         }
 
-        wrapperResponse['code'] = apiResponse.status_code;
+        clientResponse['code'] = apiResponse.status_code;
         switch(apiResponse.status_code){
             case 401:
-                wrapperResponse['body'] = { error: "a" };
+                clientResponse['body'] = { error: "a" };
                 break
             case 404:
-                wrapperResponse['body'] = { error: "n" };
+                clientResponse['body'] = { error: "n" };
                 break
             case 500:
-                wrapperResponse['body'] = { error: "g" };
+                clientResponse['body'] = { error: "g" };
                 break
             case 200:
-                let wrapperResponseBody = {};
+                let clientResponseBody = {};
                 let apiResponseBody = JSON.parse(apiResponse.response_body.data);
-                wrapperResponseBody[apiOperation.response] = apiResponseBody[clientProperties['field']];
-                wrapperResponse['body'] = wrapperResponseBody;
+                clientResponseBody[operation.response] = apiResponseBody[clientProperties['field']];
+                clientResponse['body'] = clientResponseBody;
                 break;
             default:
-                wrapperResponse['body'] = { error: "f" };
+                clientResponse['body'] = { error: "f" };
                 break;
         }
-        return wrapperResponse;
+        return clientResponse;
     }
 
 }
 
-var BitbucketApiWrapper = class BitbucketApiWrapper extends _BitbucketApiWrapper {
+var BitbucketClient = class BitbucketClient extends _BitbucketClient {
     constructor(url, authToken, timeout) {
         super(url, authToken, timeout);
         Object.assign(this, url, authToken, timeout);

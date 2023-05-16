@@ -23,8 +23,6 @@ function buildPrefsWidget() {
     let widgets = [
         buildEntry('Repository url', 'repo-url'),
         buildEntry('Authentication token', 'auth-token'),
-        //buildEntry('PR count path', 'api-pr-count-path'),
-        //buildEntry('PR count field', 'api-pr-count-property'),
         buildSpin('Request interval (seconds)', 'api-request-interval', 30, 86400, 30),
         buildSpin('Request timeout (seconds)', 'api-request-timeout', 1, 5, 1),
         buildSwitch('Notifications','show-notifications'),

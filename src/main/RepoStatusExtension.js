@@ -6,8 +6,8 @@ const Mainloop = imports.mainloop;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 
-const BitbucketApiWrapper = Me.imports.src.main.BitbucketApiWrapper;
-const ApiOperation = Me.imports.src.util.ApiOperation;
+const BitbucketClient = Me.imports.src.main.BitbucketClient;
+const ClientOperation = Me.imports.src.main.ClientOperation;
 
 const logger = new Me.imports.src.util.Logger.Logger('RepoStatusExtension');
 
@@ -15,7 +15,7 @@ const logger = new Me.imports.src.util.Logger.Logger('RepoStatusExtension');
 class _RepoStatusExtension {
 
     #settings;
-    #bitbucketApiWrapper;
+    #bitbucketClient;
 
     #timeout;
     #isInit
@@ -36,7 +36,7 @@ class _RepoStatusExtension {
             this.#init(freshStart);
         }
         main.panel._rightBox.insert_child_at_index(this.#box, 0);
-        this.#scheduleApiRequest(ApiOperation.ApiOperation.PullRequestCount);
+        this.#scheduleRequest(ClientOperation.ClientOperation.PullRequestCount);
     }
 
     stop(fullStop){
@@ -58,7 +58,7 @@ class _RepoStatusExtension {
     }
 
     #setupClients(){
-        this.#bitbucketApiWrapper = new BitbucketApiWrapper.BitbucketApiWrapper(
+        this.#bitbucketClient = new BitbucketClient.BitbucketClient(
             this.#getPropertyValue('repo-url'), 
             this.#getPropertyValue('auth-token'), 
             this.#getPropertyValue('api-request-timeout')
@@ -103,12 +103,12 @@ class _RepoStatusExtension {
 
     }
 
-    #scheduleApiRequest(apiOperation) {
+    #scheduleRequest(apiOperation) {
         this.clearLoop();
-        this.#bitbucketApiWrapper.getCallPromise(apiOperation)
+        this.#bitbucketClient.getOperationPromise(apiOperation)
         .then(
-            result => this.#handleApiResponse(apiOperation, result),
-            error => this.#handleApiResponse(_, _, error)
+            result => this.#handleResponse(apiOperation, result),
+            error => this.#handleResponse(_, _, error)
         )
         .then(
             result => this.#maybeNotify(result),
@@ -120,12 +120,12 @@ class _RepoStatusExtension {
         
         //logger.info("Scheduling next request in " + interval + " seconds")
         this.#timeout = Mainloop.timeout_add_seconds(interval, () => { 
-            this.#scheduleApiRequest(apiOperation);
+            this.#scheduleRequest(apiOperation);
             return false;
         });
     }
 
-    #handleApiResponse(apiOperation, apiResponse, err = null) {
+    #handleResponse(apiOperation, apiResponse, err = null) {
         //logger.info("API Response --> " + JSON.stringify(apiResponse));
         if(err) {
             logger.error(err);
@@ -154,7 +154,7 @@ class _RepoStatusExtension {
         if(isNaN(notifValues['nextValue'])) return;            
         if(Number(notifValues['nextValue']) < 1) return;
 
-        if(!isNaN(notifValues['currentValue']) && Number(notifValues['nextValue']) <= Number(notifValues['nextValue'])) return;
+        if(!isNaN(notifValues['currentValue']) && Number(notifValues['nextValue']) <= Number(notifValues['currentValue'])) return;
     
         let message = "New PR pending approval";
         let source = new messageTray.Source(Me.metadata.name, 'mail-drafts-symbolic');
