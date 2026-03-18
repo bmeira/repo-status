@@ -1,12 +1,14 @@
 {
   "uuid": "repo-status@kzd.homebrew.net",
   "name": "Repository Status",
-  "description": "A GNOME Shell extension (GNOME Panel applet) to keep an eye on git repositories. Currently focused on ATC's bitbucket",
+  "description": "A GNOME Shell extension (GNOME Panel applet) to keep an eye on git notifications",
   "shell-version": [
-    "40",
-    "41",
-    "42"
+    "48"
   ],
-  "url": "",
-  "version": 1
+  "url": "", 
+  "version": 1,
+  "settings-schema": "org.gnome.shell.extensions.repo-status",
+  "gettext-domain": "repo-status",
+  "session-modes": ["user", "unlock-dialog"], 
+  "extension-modes": ["normal", "secondary-screen"] 
 }

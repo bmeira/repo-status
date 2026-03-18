@@ -1,72 +1,92 @@
-const { St, Gio, Gtk, GObject, Clutter } = imports.gi;
-const { panelMenu, main, messageTray } = imports.ui;
-
-const Mainloop = imports.mainloop;
-
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-
-const BitbucketClient = Me.imports.src.main.BitbucketClient;
-const ClientOperation = Me.imports.src.main.ClientOperation;
-
-const logger = new Me.imports.src.util.Logger.Logger('RepoStatusExtension');
+import St from 'gi://St';
+import Gio from 'gi://Gio';
+import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 
 
-class _RepoStatusExtension {
+import { getExtensionPath, getSettings } from '../../utils.js';
 
-    #settings;
-    #bitbucketClient;
+// Get paths
+const extensionPath = getExtensionPath();
+const gitClientPath = `file://${extensionPath}/src/main/GitClient.js`;
+const loggerPath = `file://${extensionPath}/src/util/Logger.js`;
+const clientOperationPath = `file://${extensionPath}/src/main/ClientOperation.js`;
 
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+
+const { GitClient } = await import(gitClientPath);
+const { Logger } = await import(loggerPath);
+const { ClientOperation } = await import(clientOperationPath);
+
+const logger = new Logger('RepoStatusExtension');
+
+export class RepoStatusExtension {
+    #gitClient;
     #timeout;
-    #isInit
-
+    #isInit;
     #box;
     #icon;
     #label;
-
+    #notifications;
+    #leftMenu;
+    #rightMenu;
+    #settings;
 
     constructor() {
-        this.#settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.repo-status');
         this.#isInit = false;
+        this.#notifications = [];
+        this.#settings = getSettings();
     }
 
     start(freshStart) {
-        if(!this.#isInit){
-            this.#setupClients(); // Needs to be called separately from init
+        if (!this.#isInit) {
+            this.#setupClients();
             this.#init(freshStart);
         }
-        main.panel._rightBox.insert_child_at_index(this.#box, 0);
-        this.#scheduleRequest(ClientOperation.ClientOperation.PullRequestCount);
+        Main.panel._rightBox.insert_child_at_index(this.#box, 0);
+        this.#box.visible = true;
+        this.#scheduleRequest(ClientOperation.PullRequestCount);
     }
 
-    stop(fullStop){
+    stop(fullStop) {
         this.clearLoop();
-        if(fullStop) main.panel._rightBox.remove_child(this.#box);
+        if (fullStop) {
+            if (this.#leftMenu) {
+                this.#leftMenu.destroy();
+                this.#leftMenu = null;
+            }
+            if (this.#rightMenu) {
+                this.#rightMenu.destroy();
+                this.#rightMenu = null;
+            }
+            Main.panel._rightBox.remove_child(this.#box);
+        }
         this.#isInit = false;
     }
 
     clearLoop() {
         if (this.#timeout) {
-            Mainloop.source_remove(this.#timeout);
+            GLib.Source.remove(this.#timeout);
             this.#timeout = null;
         }
     }
 
-    #init(freshStart){
-        if(freshStart) this.#setupUi();
+    #init(freshStart) {
+        if (freshStart) this.#setupUi();
         this.#isInit = true;
     }
 
-    #setupClients(){
-        this.#bitbucketClient = new BitbucketClient.BitbucketClient(
-            this.#getPropertyValue('repo-url'), 
-            this.#getPropertyValue('auth-token'), 
-            this.#getPropertyValue('api-request-timeout')
-        );
+    #setupClients() {
+        const url = this.#settings.get_string('repo-url');
+        const token = this.#settings.get_string('auth-token');
+
+        this.#gitClient = new GitClient(url, token, 5);
     }
 
-    #setupUi(){
-        this.#box = new St.BoxLayout({ 
+    #setupUi() {
+        this.#box = new St.BoxLayout({
             style_class: 'panel-button',
             reactive: true,
             can_focus: true,
@@ -74,107 +94,197 @@ class _RepoStatusExtension {
         });
 
         this.#icon = new St.Icon({
-            gicon: Gio.icon_new_for_string(Me.path + '/icons/github.png'),
+            gicon: Gio.icon_new_for_string(`${extensionPath}/icons/github.png`),
             style_class: 'system-status-icon',
-            icon_size: '16'
+            icon_size: 16
         });
 
         this.#label = new St.Label({
-            text: 'l',
+            text: '…',
             style_class: 'system-status-icon notifications-length',
             y_align: Clutter.ActorAlign.CENTER,
             y_expand: true,
         });
 
-        this.#box.add_actor(this.#icon);
-        this.#box.add_actor(this.#label);
+        this.#box.add_child(this.#icon);
+        this.#box.add_child(this.#label);
 
-        this.#box.connect('button-press-event', (_, event) => {
-            let button = event.get_button();
+        // Use a menu manager so that clicking outside auto-closes the menu
+        this._menuManager = new PopupMenu.PopupMenuManager(this.#box);
 
-            if (button == 1) {
-                try{ Gtk.show_uri(null, this.#getPropertyValue('repo-url'), Gtk.get_current_event_time()); }
-                catch (err) { logger.error("Unable to open link " + err); }
-            } else if (button == 3) {
-                this.stop(false);
-                this.start(false);
+        // --- Left-click menu: list of notifications ---
+        this.#leftMenu = new PopupMenu.PopupMenu(this.#box, 0.0, St.Side.TOP, 0);
+        Main.uiGroup.add_child(this.#leftMenu.actor);
+        this.#leftMenu.actor.hide();
+        this._menuManager.addMenu(this.#leftMenu);
+
+        // --- Right-click menu: Refresh & Settings ---
+        this.#rightMenu = new PopupMenu.PopupMenu(this.#box, 0.0, St.Side.TOP, 0);
+
+        const refreshItem = new PopupMenu.PopupMenuItem('Refresh');
+        refreshItem.connect('activate', () => {
+            this.stop(false);
+            this.start(false);
+        });
+        this.#rightMenu.addMenuItem(refreshItem);
+
+        const settingsItem = new PopupMenu.PopupMenuItem('Settings');
+        settingsItem.connect('activate', () => {
+            try {
+                const subprocess = Gio.Subprocess.new(
+                    ['gnome-extensions', 'prefs', 'repo-status@kzd.homebrew.net'],
+                    Gio.SubprocessFlags.NONE
+                );
+            } catch (err) {
+                logger.error(`Unable to open settings: ${err}`);
             }
         });
+        this.#rightMenu.addMenuItem(settingsItem);
 
+        Main.uiGroup.add_child(this.#rightMenu.actor);
+        this.#rightMenu.actor.hide();
+        this._menuManager.addMenu(this.#rightMenu);
+
+        // --- Click handler ---
+        this.#box.connect('button-press-event', (_, event) => {
+            const button = event.get_button();
+
+            if (button === 1) {
+                // Left click — toggle notifications menu
+                this.#rightMenu.close();
+                this.#rebuildLeftMenu();
+                this.#leftMenu.toggle();
+            } else if (button === 3) {
+                // Right click — toggle settings menu
+                this.#leftMenu.close();
+                this.#rightMenu.toggle();
+            }
+        });
     }
 
-    #scheduleRequest(apiOperation) {
-        this.clearLoop();
-        this.#bitbucketClient.getOperationPromise(apiOperation)
-        .then(
-            result => this.#handleResponse(apiOperation, result),
-            error => this.#handleResponse(_, _, error)
-        )
-        .then(
-            result => this.#maybeNotify(result),
-            error => this.#maybeNotify(error)
-        )
-        .catch(err => logger.error(err));
+    #rebuildLeftMenu() {
+        this.#leftMenu.removeAll();
 
-        let interval = this.#getPropertyValue("api-request-interval"); 
-        
-        //logger.info("Scheduling next request in " + interval + " seconds")
-        this.#timeout = Mainloop.timeout_add_seconds(interval, () => { 
-            this.#scheduleRequest(apiOperation);
-            return false;
-        });
+        if (this.#notifications.length === 0) {
+            const emptyItem = new PopupMenu.PopupMenuItem('No notifications');
+            emptyItem.setSensitive(false);
+            this.#leftMenu.addMenuItem(emptyItem);
+            return;
+        }
+
+        for (const { title, link } of this.#notifications) {
+            const displayTitle = title.length > 20
+                ? title.substring(0, 20) + '…'
+                : title;
+
+            const item = new PopupMenu.PopupMenuItem(displayTitle);
+            item.connect('activate', () => {
+                try {
+                    Gio.AppInfo.launch_default_for_uri(link, null);
+                } catch (err) {
+                    logger.error(`Unable to open link: ${err}`);
+                }
+            });
+            this.#leftMenu.addMenuItem(item);
+        }
+    }
+
+    async #scheduleRequest(apiOperation) {
+        this.clearLoop();
+        try {
+            const result = await this.#gitClient.getOperationPromise(apiOperation);
+            const handled = this.#handleResponse(apiOperation, result);
+            this.#maybeNotify(handled);
+        } catch (error) {
+            this.#handleResponse(apiOperation, null, error);
+            this.#maybeNotify(error);
+        }
+
+        const interval = this.#settings.get_int('api-request-interval');
+        this.#timeout = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            interval,
+            () => {
+                this.#scheduleRequest(apiOperation);
+                return GLib.SOURCE_REMOVE;
+            }
+        );
     }
 
     #handleResponse(apiOperation, apiResponse, err = null) {
-        //logger.info("API Response --> " + JSON.stringify(apiResponse));
-        if(err) {
+        if (err) {
             logger.error(err);
+            this.#label.set_text('!');
             return null;
         }
 
-        let nextValue = apiResponse.code !== 200 ? apiResponse.body.error : apiResponse.body[apiOperation.response];
+        if (apiResponse.code !== 200) {
+            const errDesc = apiResponse.body.errDesc || apiResponse.body.error || '?';
+            logger.error(`API error ${apiResponse.code}: ${errDesc}`);
+            this.#label.set_text('!');
+            return null;
+        }
 
-        this.#box.visible = !this.#getPropertyValue("hide-extension") || nextValue != 0
-        
-        let values = {};
-        values['currentValue'] = this.#label.get_text();
-        values['nextValue'] = nextValue;
+        const nextValue = apiResponse.body[apiOperation.response];
 
-        this.#label.set_text(nextValue.toString());
+        // Store notification data for the menus
+        const titles = apiResponse.body[apiOperation.titles] || [];
+        const links = apiResponse.body[apiOperation.links] || [];
+        this.#notifications = titles.map((title, i) => ({
+            title,
+            link: links[i] || ''
+        }));
+
+        const values = {
+            currentValue: this.#label.get_text().trim(),
+            nextValue: nextValue
+        };
+
+        this.#label.set_text(`${nextValue}`);
+
+        // Hide the panel button when count is 0 and the setting is enabled
+        if (this.#settings.get_boolean('hide-extension')) {
+            this.#box.visible = (Number(nextValue) > 0);
+        } else {
+            this.#box.visible = true;
+        }
 
         return values;
     }
 
     #maybeNotify(notifValues) {
-        if(notifValues === null){
-            logger.error("Got null notifs");
+        // Skip if notifications are disabled in settings
+        if (!this.#settings.get_boolean('show-notifications')) {
             return;
         }
-        if(!this.#getPropertyValue("show-notifications")) return;
-        if(isNaN(notifValues['nextValue'])) return;            
-        if(Number(notifValues['nextValue']) < 1) return;
 
-        if(!isNaN(notifValues['currentValue']) && Number(notifValues['nextValue']) <= Number(notifValues['currentValue'])) return;
-    
-        let message = "New PR pending approval";
-        let source = new messageTray.Source(Me.metadata.name, 'mail-drafts-symbolic');
-        main.messageTray.add(source);
-        let notification = new messageTray.Notification(source, Me.metadata.name, message);
-        notification.setTransient(false);
-        source.showNotification(notification);
-    }
+        if (!notifValues || 
+            isNaN(notifValues['nextValue']) || 
+            Number(notifValues['nextValue']) < 1) {
+            return;
+        }
 
-    #getPropertyValue(propertyKey){
-        if(propertyKey === "show-notifications" || propertyKey === "hide-extension") return this.#settings.get_boolean(propertyKey);
-        if(propertyKey === "api-request-interval" || propertyKey == "api-request-timeout") return this.#settings.get_int(propertyKey);
-        return this.#settings.get_string(propertyKey) || null;
+        if (!isNaN(notifValues['currentValue']) && 
+            Number(notifValues['nextValue']) <= Number(notifValues['currentValue'])) {
+            return;
+        }
+
+        const icon = Gio.icon_new_for_string('mail-drafts-symbolic');
+        
+        const source = new MessageTray.Source({
+            title: 'Repository Status',
+            icon: icon
+        });
+
+        Main.messageTray.add(source);
+
+        const notification = new MessageTray.Notification({
+            source: source,
+            title: 'Repository Status',
+            body: 'New PR pending approval'
+        });
+
+        source.addNotification(notification);
     }
 
 }
-
-var RepoStatusExtension = class RepoStatusExtension extends _RepoStatusExtension {
-    constructor() {
-        super();
-        Object.assign(this);
-    }
-};

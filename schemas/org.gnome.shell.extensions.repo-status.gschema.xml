@@ -18,12 +18,6 @@
             <summary>API request interval</summary>
             <description>Interval (in seconds) to perform API requests</description>
         </key>
-        <key name="api-request-timeout" type="i">
-            <range min="1" max="5"/>
-            <default>2</default>
-            <summary>Request timeout</summary>
-            <description>Timeout (in ms) for API requests</description>
-        </key>
         <key name="hide-extension" type="b">
             <default>false</default>
             <summary>Flag to hide extension when no significant events exist</summary>

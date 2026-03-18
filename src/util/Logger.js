@@ -1,25 +1,31 @@
-class _Logger {
-
+export class Logger {
     #clazz;
     #extensionName;
+    #debugMode;
 
-    constructor(clazz){
-        this.#clazz = '[' + clazz + ']';
-        this.#extensionName = '[repo-status]'
+    constructor(clazz, debugEnabled = false) {
+        this.#clazz = `[${clazz}]`;
+        this.#extensionName = '[repo-status]';
+        this.#debugMode = debugEnabled;
     }
 
-    info(message){
-        global.log(this.#extensionName + this.#clazz + '[info] ' + message);
+    info(message) {
+        console.log(`${this.#extensionName}${this.#clazz}[INFO] ${message}`);
     }
 
-    error(message){
-        global.log(this.#extensionName + this.#clazz + '[error] ' + message);
+    error(message) {
+        console.error(`${this.#extensionName}${this.#clazz}[ERROR] ${message}`);
+    }
+
+    debug(message) {
+        if (this.#debugMode) {
+            console.debug(`${this.#extensionName}${this.#clazz}[DEBUG] ${message}`);
+        }
+    }
+
+    warn(message) {
+        console.warn(`${this.#extensionName}${this.#clazz}[WARN] ${message}`);
     }
 }
 
-var Logger = class Logger extends _Logger {
-    constructor(clazz) {
-        super(clazz);
-        Object.assign(this, clazz);
-    }
-};
+export default Logger;

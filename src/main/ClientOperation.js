@@ -1,18 +1,32 @@
-class _ClientOperation {
-    static PullRequestCount = new _ClientOperation("pullRequestCount", "count");
+export class ClientOperation {
+    static PullRequestCount = new ClientOperation("pullRequestCount", "count", "links", "titles");
 
     #description;
-    #response; // field to place the actual response from the client - normalizes response structure between multiple clients
+    #response;
+    #links;
+    #titles;
 
-    constructor(description, response){
-        this.description = description;
-        this.response = response;
+    constructor(description, response, links, titles) {
+        this.#description = description;
+        this.#response = response;
+        this.#links = links;
+        this.#titles = titles;
+    }
+
+    get description() {
+        return this.#description;
+    }
+
+    get response() {
+        return this.#response;
+    }
+
+    get links() {
+        return this.#links;
+    }
+
+    get titles() {
+        return this.#titles;
     }
 }
 
-var ClientOperation = class ClientOperation extends _ClientOperation {
-    constructor(description, response) {
-        super(description, response);
-        Object.assign(this, description, response);
-    }
-};
